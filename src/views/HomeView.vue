@@ -5,6 +5,7 @@ import axios from 'axios';
 const address = ref("http://localhost:8080")
 const model = ref("baichuan-vicuna-7b.ggmlv3.q4_0.bin")
 const prompt = ref("")
+const copyOfprompt = ref("")
 const responseContent = ref("")
 const inProgress = ref(false)
 const models = ref([])
@@ -15,11 +16,11 @@ const loadModels = async() => {
 }
 
 onMounted(async() => {
-  loadModels()
+  await loadModels()
 })
 
 watch(address, async() => {
-  loadModels()
+  await loadModels()
 })
 
 const buttonEnabled = computed(() => {
@@ -28,6 +29,9 @@ const buttonEnabled = computed(() => {
 
 const onSubmit = async () => {
   inProgress.value = true
+  copyOfprompt.value = prompt.value
+  responseContent.value = ""
+
   const { data } = await axios.post(`${address.value}/v1/chat/completions`, {
      "model": model.value,
      "messages": [{"role": "user", "content": prompt.value}],
@@ -79,7 +83,7 @@ const onSubmit = async () => {
         </div>
         <div class="column">
           <div class="block response" v-if="responseContent">
-            <b>{{ prompt }}</b>{{  responseContent  }}
+            <b>{{ copyOfprompt }}</b>{{  responseContent  }}
           </div>
         </div>
       </div>
