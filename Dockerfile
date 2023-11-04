@@ -12,4 +12,4 @@ RUN npm run build
 
 FROM nginx:alpine3.18
 
-COPY --from=build /app/dist /var/www/html
+COPY --from=build /app/dist /usr/share/nginx/html
