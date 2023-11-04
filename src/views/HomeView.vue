@@ -3,28 +3,39 @@ import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios';
 
 const address = ref("http://localhost:8080")
-const model = ref("baichuan-vicuna-7b.ggmlv3.q4_0.bin")
+const currentModel = ref(null)
 const prompt = ref("")
 const copyOfprompt = ref("")
 const responseContent = ref("")
 const inProgress = ref(false)
-const models = ref([])
+const availableModels = ref([])
+
+const apiClient = axios.create({});
 
 const loadModels = async() => {
-  const { data } = await axios.get(`${address.value}/models`)
-  models.value = data.data
+  try {
+    const { data } = await apiClient.get(`${address.value}/models`)
+    availableModels.value = data.data
+    currentModel.value = null
+    if (!currentModel.value && availableModels.value.length > 0) {
+      currentModel.value = availableModels.value[0].id
+    }
+  } catch(error: any) {
+    console.error(error.message)
+    availableModels.value = []
+    alert(`fail to load models: ${error.message}`)
+    throw error
+  }
 }
 
 onMounted(async() => {
   await loadModels()
 })
 
-watch(address, async() => {
-  await loadModels()
-})
+const refreshModels = loadModels
 
 const buttonEnabled = computed(() => {
-  return model.value && address.value && prompt.value && !inProgress.value;
+  return currentModel.value && address.value && prompt.value && !inProgress.value;
 })
 
 const onSubmit = async () => {
@@ -32,8 +43,8 @@ const onSubmit = async () => {
   copyOfprompt.value = prompt.value
   responseContent.value = ""
 
-  const { data } = await axios.post(`${address.value}/v1/chat/completions`, {
-     "model": model.value,
+  const { data } = await apiClient.post(`${address.value}/v1/chat/completions`, {
+     "model": currentModel.value,
      "messages": [{"role": "user", "content": prompt.value}],
      "temperature": 0.8
    })
@@ -53,7 +64,7 @@ const onSubmit = async () => {
           <div class="field">
             <div class="label">LocalAI Address</div>
             <div class="control">
-              <input class="input" type="text" placeholder="address" v-model="address">
+              <input class="input" type="text" placeholder="address" v-model="address" v-on:blur="refreshModels">
             </div>
           </div>
 
@@ -61,8 +72,8 @@ const onSubmit = async () => {
             <div class="label">Model</div>
             <div class="control">
               <div class="select">
-                <select v-model="model">
-                  <option v-for="item in models" v-bind:key="item.id">{{  item.id }}</option>
+                <select v-model="currentModel">
+                  <option v-for="item in availableModels" v-bind:key="item.id">{{  item.id }}</option>
                 </select>
               </div>
             </div>
