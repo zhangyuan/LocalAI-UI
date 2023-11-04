@@ -1,45 +1,100 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import axios from 'axios'
+import axios, { type AxiosInstance } from 'axios'
+
+class Storage {
+  readonly keyPrefix = "localai-ui:"
+  readonly addressKey = "address"
+  readonly currentModelIdKey = "currentModelId"
+
+  public saveAddress(address: string) {
+    localStorage.setItem(this.key(this.addressKey), address)
+  }
+
+  public getAddress(): string | null {
+    return localStorage.getItem(this.key(this.addressKey))
+  }
+
+  public saveCurrentModelId(address: string) {
+    localStorage.setItem(this.key(this.currentModelIdKey), address)
+  }
+
+  public getModelId(): string | null {
+    return localStorage.getItem(this.key(this.currentModelIdKey))
+  }
+
+  key(name: string) {
+    return `${this.keyPrefix}:${name}`
+  }
+}
 
 type Model = {
   id: string
 }
 
-const address = ref('http://localhost:8080')
-const currentModel = ref('')
+const storage = new Storage()
+
+const address = ref(storage.getAddress())
+const currentModelId = ref(storage.getModelId())
 const prompt = ref('')
 const copyOfprompt = ref('')
 const responseContent = ref('')
 const inProgress = ref(false)
 const availableModels = ref<Model[]>([])
 
-const apiClient = axios.create({})
+class ApiClient {
+  readonly client: AxiosInstance
+
+  constructor(baseUrl: string) {
+    this.client = axios.create({baseURL: baseUrl})
+  }
+
+  async get(path: string, config?: any) {
+    return this.client.get(path, config)
+  }
+
+  async post(path: string, data?: any) {
+    return this.client.post(path, data)
+  }
+}
+
+watch(address,async (newValue) => {
+  storage.saveAddress(newValue || '')
+})
+
+watch(currentModelId, async (newValue) => {
+  storage.saveCurrentModelId(newValue || '')
+})
 
 const loadModels = async () => {
   try {
-    const { data } = await apiClient.get(`${address.value}/models`)
+    const { data } = await new ApiClient(address.value!).get(`/models`)
     availableModels.value = data.data
-    currentModel.value = ''
-    if (!currentModel.value && availableModels.value.length > 0) {
-      currentModel.value = availableModels.value[0].id
+    const currentModel = availableModels.value.find(model => model.id == currentModelId.value)
+    if(currentModel) {
+      currentModelId.value = currentModel.id
+    } else if (availableModels.value.length) {
+      currentModelId.value = availableModels.value[0].id
     }
   } catch (error: any) {
-    console.error(error.message)
     availableModels.value = []
+    currentModelId.value = ""
+
     alert(`fail to load models: ${error.message}`)
     throw error
   }
 }
 
 onMounted(async () => {
-  await loadModels()
+  if (address.value) {
+    await loadModels()
+  }
 })
 
 const refreshModels = loadModels
 
 const buttonEnabled = computed(() => {
-  return currentModel.value && address.value && prompt.value && !inProgress.value
+  return currentModelId.value && address.value && prompt.value && !inProgress.value
 })
 
 const onSubmit = async () => {
@@ -47,8 +102,8 @@ const onSubmit = async () => {
   copyOfprompt.value = prompt.value
   responseContent.value = ''
 
-  const { data } = await apiClient.post(`${address.value}/v1/chat/completions`, {
-    model: currentModel.value,
+  const { data } = await new ApiClient(address.value!).post(`/v1/chat/completions`, {
+    model: currentModelId.value,
     messages: [{ role: 'user', content: prompt.value }],
     temperature: 0.8
   })
@@ -81,7 +136,7 @@ const onSubmit = async () => {
             <div class="label">Model</div>
             <div class="control">
               <div class="select">
-                <select v-model="currentModel">
+                <select v-model="currentModelId">
                   <option v-for="item in availableModels" v-bind:key="item.id">
                     {{ item.id }}
                   </option>
