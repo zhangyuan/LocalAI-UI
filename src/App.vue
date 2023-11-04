@@ -5,8 +5,7 @@ import { RouterView } from 'vue-router'
 <template>
   <header>
     <div class="wrapper">
-      <nav>
-      </nav>
+      <nav></nav>
     </div>
   </header>
 
