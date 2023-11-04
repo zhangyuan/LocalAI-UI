@@ -2,13 +2,17 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios';
 
+type Model = {
+  id: string
+}
+
 const address = ref("http://localhost:8080")
-const currentModel = ref(null)
+const currentModel = ref("")
 const prompt = ref("")
 const copyOfprompt = ref("")
 const responseContent = ref("")
 const inProgress = ref(false)
-const availableModels = ref([])
+const availableModels = ref<Model[]>([])
 
 const apiClient = axios.create({});
 
@@ -16,7 +20,7 @@ const loadModels = async() => {
   try {
     const { data } = await apiClient.get(`${address.value}/models`)
     availableModels.value = data.data
-    currentModel.value = null
+    currentModel.value = ""
     if (!currentModel.value && availableModels.value.length > 0) {
       currentModel.value = availableModels.value[0].id
     }
