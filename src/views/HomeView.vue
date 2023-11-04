@@ -93,7 +93,7 @@ const onSubmit = async () => {
           <div class="field">
             <div class="label">Prompt</div>
             <div class="control">
-              <textarea class="textarea" v-model.trim="prompt"></textarea>
+              <textarea class="textarea" v-model.trim="prompt" rows="20"></textarea>
             </div>
           </div>
 
