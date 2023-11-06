@@ -46,7 +46,7 @@ class ApiClient {
   readonly client: AxiosInstance
 
   constructor(baseUrl: string) {
-    this.client = axios.create({baseURL: baseUrl})
+    this.client = axios.create({ baseURL: baseUrl })
   }
 
   async get(path: string, config?: any) {
@@ -58,7 +58,7 @@ class ApiClient {
   }
 }
 
-watch(address,async (newValue) => {
+watch(address, async (newValue) => {
   storage.saveAddress(newValue || '')
 })
 
@@ -71,7 +71,7 @@ const loadModels = async () => {
     const { data } = await new ApiClient(address.value!).get(`/models`)
     availableModels.value = data.data
     const currentModel = availableModels.value.find(model => model.id == currentModelId.value)
-    if(currentModel) {
+    if (currentModel) {
       currentModelId.value = currentModel.id
     } else if (availableModels.value.length) {
       currentModelId.value = availableModels.value[0].id
@@ -102,14 +102,60 @@ const onSubmit = async () => {
   copyOfprompt.value = prompt.value
   responseContent.value = ''
 
-  const { data } = await new ApiClient(address.value!).post(`/v1/chat/completions`, {
-    model: currentModelId.value,
-    messages: [{ role: 'user', content: prompt.value }],
-    temperature: 0.8
-  })
+  if (typeof fetch === 'undefined') {
+    const { data } = await new ApiClient(address.value!).post(`/v1/chat/completions`, {
+      model: currentModelId.value,
+      messages: [{ role: 'user', content: prompt.value }],
+      temperature: 0.8
+    })
 
-  inProgress.value = false
-  responseContent.value = data.choices[0].message.content
+    inProgress.value = false
+    responseContent.value = data.choices[0].message.content
+  } else {
+    const payload = {
+      model: currentModelId.value,
+      messages: [{ role: 'user', content: prompt.value }],
+      temperature: 0.8,
+      stream: true
+    }
+
+    const fetchResponse = await fetch(`${address.value}/v1/chat/completions`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+
+    const reader = fetchResponse.body?.getReader()
+    if (!reader) {
+      return
+    }
+
+    while (true) { // eslint-disable-line no-constant-condition
+      const { value, done } = await reader.read()
+      if (done) {
+        inProgress.value = false
+        break
+      }
+      const decoder = new TextDecoder('utf-8')
+      const chunk = decoder.decode(value)
+
+      const messages = chunk.trim().split('\n\n')
+      for (const message of messages) {
+        const messageData = message.substring("data: ".length)
+        const messageObject = JSON.parse(messageData)
+
+        if (messageObject.choices[0].finish_reason == "stop") {
+          inProgress.value = false
+          break
+        }
+
+        responseContent.value += messageObject.choices[0].delta.content
+      }
+    }
+  }
+
 }
 </script>
 
@@ -122,13 +168,7 @@ const onSubmit = async () => {
           <div class="field">
             <div class="label">LocalAI Address</div>
             <div class="control">
-              <input
-                class="input"
-                type="text"
-                placeholder="address"
-                v-model="address"
-                v-on:blur="refreshModels"
-              />
+              <input class="input" type="text" placeholder="address" v-model="address" v-on:blur="refreshModels" />
             </div>
           </div>
 
@@ -162,8 +202,7 @@ const onSubmit = async () => {
         </div>
         <div class="column">
           <div class="block response" v-if="responseContent">
-            <b>{{ copyOfprompt }}</b
-            >{{ responseContent }}
+            <b>{{ copyOfprompt }}</b>{{ responseContent }}
           </div>
         </div>
       </div>
