@@ -59,6 +59,9 @@ class ApiClient {
 }
 
 watch(address, async (newValue) => {
+  if (newValue && newValue.endsWith("/")) {
+    address.value = newValue.slice(0, -1)
+  }
   storage.saveAddress(newValue || '')
 })
 
@@ -147,7 +150,6 @@ const onSubmit = async () => {
         const messageObject = JSON.parse(messageData)
 
         if (messageObject.choices[0].finish_reason == "stop") {
-          inProgress.value = false
           break
         }
 
